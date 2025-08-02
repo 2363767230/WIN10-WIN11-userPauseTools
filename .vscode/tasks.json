@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build", // 与 preLaunchTask 名称一致
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g", // 生成调试信息
+                "${file}", // 编译当前文件
+                "-o", 
+                "${workspaceFolder}/userPause.exe", // 输出到指定路径
+                "-Wall" // 启用所有警告
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}

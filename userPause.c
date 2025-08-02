@@ -4,8 +4,8 @@
 #include <windows.h>
 
 #define HOTKEY_ID 1
-#define MODIFIER_KEY MOD_CONTROL
-#define HOTKEY_KEY VK_F2
+#define MODIFIER_KEY (MOD_CONTROL | MOD_ALT) // Ctrl+Alt组合
+#define HOTKEY_KEY 'X'                       // 副键为X
 #define LIST_NUM 3
 #define NAME_MAX 512
 const char *toolFolderName = "tools";
@@ -24,15 +24,11 @@ bool GetExecutableDirectory(char *path, size_t size)
 {
     char executablePath[NAME_MAX];
     if (GetModuleFileName(NULL, executablePath, NAME_MAX) == 0)
-    {
         return false;
-    }
 
     char *lastSlash = strrchr(executablePath, '\\');
-    if (lastSlash != NULL)
-    {
+    if (lastSlash)
         *lastSlash = '\0';
-    }
 
     snprintf(path, size, "%s", executablePath);
     return true;
@@ -41,14 +37,7 @@ bool GetExecutableDirectory(char *path, size_t size)
 bool ExecutePssuspend(const char *toolFolder, const char *processName, bool isResume)
 {
     char command[NAME_MAX * 2];
-    if (isResume)
-    {
-        snprintf(command, sizeof(command), "%s\\pssuspend.exe -r %s", toolFolder, processName);
-    }
-    else
-    {
-        snprintf(command, sizeof(command), "%s\\pssuspend.exe %s", toolFolder, processName);
-    }
+    snprintf(command, sizeof(command), "%s\\pssuspend.exe %s %s", toolFolder, isResume ? "-r" : "", processName);
     return system(command) == 0;
 }
 
@@ -63,13 +52,13 @@ void HandleProcessToggle(const char *toolFolder, const char *processName)
         {
             if (ExecutePssuspend(toolFolder, processName, true))
             {
-                printf("[SUCCESS] Process %s resumed\n", processName);
+                printf("[成功] 进程 %s 已恢复\n", processName);
                 Beep(500, 600);
                 isPaused = false;
             }
             else
             {
-                printf("[ERROR] Failed to resume %s\n", processName);
+                printf("[错误] 恢复 %s 失败\n", processName);
                 Beep(250, 600);
             }
         }
@@ -77,21 +66,21 @@ void HandleProcessToggle(const char *toolFolder, const char *processName)
         {
             if (ExecutePssuspend(toolFolder, processName, false))
             {
-                printf("[SUCCESS] Process %s paused\n", processName);
+                printf("[成功] 进程 %s 已暂停\n", processName);
                 Beep(500, 600);
                 isPaused = true;
             }
             else
             {
-                printf("[ERROR] Failed to pause %s\n", processName);
+                printf("[错误] 暂停 %s 失败\n", processName);
                 Beep(250, 600);
             }
         }
     }
     else
     {
-        printf("[ERROR] pssuspend.exe not found\n");
-        printf("  => Ensure pssuspend.exe exists in the tools folder\n");
+        printf("[错误] 未找到 pssuspend.exe\n");
+        printf("  => 请确保 tools 文件夹中存在 pssuspend.exe\n");
         Beep(250, 600);
     }
 }
@@ -105,24 +94,25 @@ void RegisterHotKeyAndWindow()
 
     if (!RegisterClassA(&wc))
     {
-        printf("[ERROR] Window class registration failed\n");
+        printf("[错误] 窗口类注册失败\n");
         return;
     }
 
     HWND hwnd = CreateWindowA("HotkeyDemo", "HotkeyDemo", 0, 0, 0, 0, 0, NULL, NULL, wc.hInstance, NULL);
     if (!hwnd)
     {
-        printf("[ERROR] Window creation failed\n");
+        printf("[错误] 窗口创建失败\n");
         return;
     }
 
+    // 注册 Ctrl+Alt+X 热键
     if (RegisterHotKey(hwnd, HOTKEY_ID, MODIFIER_KEY, HOTKEY_KEY))
     {
-        printf("[STATUS] Hotkey Ctrl+F2 registered\n");
+        printf("[状态] 热键 Ctrl+Alt+X 已注册\n");
     }
     else
     {
-        printf("[ERROR] Failed to register Ctrl+F2\n");
+        printf("[错误] 注册 Ctrl+Alt+X 失败\n");
         return;
     }
 
@@ -145,7 +135,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             snprintf(toolFolder, NAME_MAX, "%s\\%s", toolFolder, toolFolderName);
             if (GetFileAttributesA(toolFolder) == INVALID_FILE_ATTRIBUTES)
             {
-                printf("[ERROR] Tools folder not found\n");
+                printf("[错误] 未找到工具文件夹\n");
                 Beep(750, 600);
             }
             else
@@ -155,7 +145,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         else
         {
-            printf("[ERROR] Failed to get executable path\n");
+            printf("[错误] 获取可执行路径失败\n");
             Beep(250, 600);
         }
     }
@@ -164,20 +154,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 int main()
 {
-    SetConsoleOutputCP(CP_UTF8); // 统一使用UTF-8输出
+    SetConsoleOutputCP(CP_UTF8);
 
-    char targetProcessNamelist[LIST_NUM][NAME_MAX] = {"MonsterHunterWorld.exe", "BBQ-Win64-Shipping.exe", ""};
-    printf("懒得弄中文兼容\n");
-    printf("Process Suspender v1.0 (by lil candy)\n");
-    printf("Compatible with WIN10/WIN11\n\n");
-    printf("Target Process List:\n");
+    char targetProcessNamelist[LIST_NUM][NAME_MAX] = 
+    {
+        "MonsterHunterWorld.exe",
+        "BBQ-Win64-Shipping.exe", 
+        ""
+    };
+    printf("进程挂起器 v1.0--20250802 --made by lil candy\n");
+    printf("目标进程列表:\n");
     for (int i = 0; i < LIST_NUM - 1; i++)
         printf("  %d: %s\n", i + 1, targetProcessNamelist[i]);
-    printf("  %d: Custom process\n\n", LIST_NUM);
+    printf("  %d: 自定义进程\n\n", LIST_NUM);
 
     int choice = 0;
-    printf(" Select %d process can select your own exe\r\n", LIST_NUM);
-    printf("Select target process [1-%d]: ", LIST_NUM);
+    printf("选择目标进程 [1-%d]: ", LIST_NUM);
     scanf("%d", &choice);
     getchar();
 
@@ -187,20 +179,20 @@ int main()
     }
     else if (choice == LIST_NUM)
     {
-        printf("Enter process name: ");
+        printf("输入进程名称: ");
         fgets(targetProcessName, NAME_MAX, stdin);
         targetProcessName[strcspn(targetProcessName, "\n")] = '\0';
     }
     else
     {
-        printf("[WARN] Invalid selection, using default process\n");
+        printf("[警告] 选择无效，使用默认进程\n");
         strncpy(targetProcessName, targetProcessNamelist[0], NAME_MAX);
     }
 
-    printf("\nMonitoring: %s\n", targetProcessName);
-    printf("Press Ctrl+F2 to toggle pause/resume state\n\n");
+    printf("\n监控中: %s\n", targetProcessName);
+    printf("按 Ctrl+Alt+X 切换暂停/恢复状态\n\n"); // 更新热键提示
 
     RegisterHotKeyAndWindow();
-    getchar(); // 等待回车
+    getchar();
     return 0;
 }
